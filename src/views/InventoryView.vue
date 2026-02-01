@@ -1,341 +1,264 @@
 <template>
-  <div class="p-4 sm:p-6 lg:p-8 w-full">
+  <CommonLoader :show="isLoading" text="Loading stock data..." />
 
-    <!-- Header -->
-    <div class="mb-6 sm:mb-8">
-      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <div>
-          <h1 class="text-2xl sm:text-3xl font-semibold">Stock Management</h1>
-          <p class="text-gray-500 text-xs sm:text-sm">Track and update product batches easily</p>
+  <div v-show="!isLoading" class="p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto">
+
+    <div class="mb-6 sm:mb-10">
+      <div class="flex flex-col md:flex-row md:justify-between md:items-end gap-6">
+        <div class="space-y-1">
+          <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Stock Management</h1>
+          <p class="text-gray-500 text-sm">Track, update, and dispatch product batches.</p>
         </div>
 
-        <!-- Search + Add New Stock -->
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
-          <input v-model="search" type="text" placeholder="Search product..."
-            class="w-full sm:w-64 px-4 py-2 rounded-full border border-gray-300 focus:ring-2 focus:ring-purple-500 text-sm" />
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+          <div class="relative flex-1 sm:min-w-[240px]">
+            <Icon icon="tabler:search" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input v-model="search" type="text" placeholder="Search product..."
+              class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm transition-all outline-none" />
+          </div>
 
-          <button class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-full whitespace-nowrap text-sm sm:text-base" 
-            @click="addNewStock()">
-            + Add New Stock
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              :disabled="exporting"
+              class="flex-1 sm:flex-none px-4 py-2.5 bg-green-50 text-green-700 border border-green-100 hover:bg-green-600 hover:text-white rounded-xl font-medium transition-all active:scale-95 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+              @click="exportToExcel">
+              <Icon :icon="exporting ? 'tabler:loader-2' : 'tabler:file-spreadsheet'" :class="['w-5 h-5', { 'animate-spin': exporting }]" />
+              <span class="hidden sm:inline">Export</span>
+            </button>
+
+            <button
+              class="flex-1 sm:flex-none px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-sm shadow-purple-200 font-medium transition-all active:scale-95 flex items-center justify-center gap-2 text-sm whitespace-nowrap"
+              @click="addNewStock()">
+              <Icon icon="tabler:plus" class="w-5 h-5" />
+              Add New Stock
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Product List -->
-    <div class="space-y-4 sm:space-y-6">
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 mb-8">
+      <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+        <p class="text-gray-500 text-xs font-medium uppercase tracking-wider">Total Products</p>
+        <p class="text-2xl font-bold text-gray-900 mt-1">{{ products.length }}</p>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+        <p class="text-gray-500 text-xs font-medium uppercase tracking-wider">Inventory</p>
+        <p class="text-2xl font-bold text-purple-600 mt-1">{{ totalInventory }}</p>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm col-span-2 lg:col-span-1">
+        <p class="text-gray-500 text-xs font-medium uppercase tracking-wider">Low Stock Alerts</p>
+        <p class="text-2xl font-bold text-red-500 mt-1">{{ lowStockCount }}</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-4">
       <div v-for="item in filteredProducts" :key="item.id"
-        class="bg-white shadow rounded-xl sm:rounded-2xl overflow-hidden">
+        class="bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow rounded-2xl overflow-hidden group">
         
-        <!-- Mobile Layout -->
-        <div class="block lg:hidden p-4 space-y-3">
-          <!-- Product Info -->
-          <div class="flex items-start gap-3">
-            <img :src="item.image" class="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover flex-shrink-0" />
+        <div class="p-4 sm:p-5">
+          <div class="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6">
             
-            <div class="flex-1 min-w-0">
-              <h2 class="text-base sm:text-lg font-medium truncate">{{ item.name }}</h2>
-              <p class="text-gray-500 text-xs sm:text-sm flex items-center gap-1 flex-wrap">
-                <Icon icon="tabler:box" class="w-3 h-3 sm:w-4 sm:h-4" />
-                {{ item.size }}
-              </p>
-              <p class="text-xs sm:text-sm text-gray-600 mt-1">
-                Stock: <span class="font-bold">{{ item.stock }} Bottles</span>
-              </p>
+            <div class="flex items-center gap-4 flex-1">
+              <div class="relative w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0">
+                <img v-if="isValidImage(item.image)" :src="item.image" 
+                  class="w-full h-full rounded-2xl object-cover border border-gray-100" />
+                <div v-else class="w-full h-full rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-400">
+                  <Icon icon="tabler:bottle" class="w-8 h-8" />
+                </div>
+                <div :class="['absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white lg:hidden', getStatusClass(item.stock, 'bg')]"></div>
+              </div>
+
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 mb-1">
+                  <h2 class="text-base sm:text-lg font-bold text-gray-900 truncate">{{ item.name }}</h2>
+                  <span :class="['hidden lg:inline-block px-2.5 py-0.5 rounded-lg text-xs font-bold uppercase tracking-wide', getStatusClass(item.stock, 'badge')]">
+                    {{ getStatus(item.stock) }}
+                  </span>
+                </div>
+                <div class="flex items-center flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
+                  <span class="flex items-center gap-1">
+                    <Icon icon="tabler:box" class="w-4 h-4 text-purple-500" /> {{ item.size }}
+                  </span>
+                  <span class="flex items-center gap-1 font-semibold text-gray-700">
+                    <Icon icon="tabler:database" class="w-4 h-4 text-gray-400" /> {{ item.stock }} Bottles
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <!-- Status Badge -->
-            <span :class="[
-              'px-2 py-1 rounded-full text-xs whitespace-nowrap',
-              item.stock > 80
-                ? 'bg-green-100 text-green-700'
-                : item.stock > 20
-                  ? 'bg-yellow-100 text-yellow-700'
-                  : 'bg-red-100 text-red-700'
-            ]">
-              {{ getStatus(item.stock) }}
-            </span>
-          </div>
+            <div class="flex flex-wrap lg:flex-nowrap items-center gap-2 pt-3 lg:pt-0 border-t lg:border-t-0 border-gray-50">
+              <button @click="openAddStockModel(item.id)"
+                class="flex-1 lg:flex-none px-4 py-2.5 bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2">
+                <Icon icon="tabler:circle-plus" class="w-4 h-4" /> Add
+              </button>
+              
+              <button @click="openDispatchModel(item.id)"
+                class="flex-1 lg:flex-none px-4 py-2.5 bg-gray-50 text-gray-700 hover:bg-gray-900 hover:text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2">
+                <Icon icon="tabler:truck-delivery" class="w-4 h-4" /> Dispatch
+              </button>
 
-          <!-- Action Buttons -->
-          <div class="flex flex-col sm:flex-row gap-2">
-            <button class="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-full text-sm"
-              @click="openAddStockModel(item.id)">
-              Add Stock
-            </button>
-
-            <button class="flex-1 px-3 py-2 bg-transparent border border-gray-300 text-black rounded-full hover:bg-gray-100 text-sm"
-              @click="openDispatchModel(item.id)">
-              Dispatch Items
-            </button>
-          </div>
-
-          <button class="w-full text-purple-600 hover:underline underline-offset-1 text-sm" 
-            @click="openViewDetails(item.id)">
-            View Details
-          </button>
-        </div>
-
-        <!-- Desktop Layout -->
-        <div class="hidden lg:flex items-center justify-between p-4">
-          <!-- Left -->
-          <div class="flex items-center gap-4">
-            <img :src="item.image" class="w-20 h-20 rounded-xl object-cover" />
-
-            <div>
-              <h2 class="text-lg font-medium">{{ item.name }}</h2>
-              <p class="text-gray-500 text-sm flex items-center gap-1">
-                <Icon icon="tabler:box" class="w-4 h-4" />
-                {{ item.size }}
-                <span class="ml-2">Stock:</span>
-                <span class="text-[14px] font-bold">{{ item.stock }} Bottles</span>
-              </p>
+              <button @click="openViewDetails(item.id)"
+                class="w-full lg:w-auto px-4 py-2.5 text-purple-600 hover:text-purple-800 text-sm font-bold transition-all flex items-center justify-center gap-1">
+                Details <Icon icon="tabler:chevron-right" class="w-4 h-4" />
+              </button>
             </div>
-          </div>
-
-          <!-- Right -->
-          <div class="flex items-center gap-4">
-            <span :class="[
-              'px-3 py-1 rounded-full text-sm',
-              item.stock > 80
-                ? 'bg-green-100 text-green-700'
-                : item.stock > 20
-                  ? 'bg-yellow-100 text-yellow-700'
-                  : 'bg-red-100 text-red-700'
-            ]">
-              {{ getStatus(item.stock) }}
-            </span>
-
-            <button class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-full"
-              @click="openAddStockModel(item.id)">
-              Add Stock
-            </button>
-
-            <button class="px-4 py-2 bg-transparent border text-black rounded-full hover:bg-[#d5dbd6]"
-              @click="openDispatchModel(item.id)">
-              Dispatch Items
-            </button>
-
-            <span class="text-purple-600 hover:underline underline-offset-1 cursor-pointer" 
-              @click="openViewDetails(item.id)">
-              view details
-            </span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Footer Stats -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 sm:mt-12 text-center bg-white p-4 sm:p-6 shadow rounded-xl text-gray-700">
-      <div class="py-2">
-        <p class="font-semibold text-base sm:text-lg">Total Products</p>
-        <p class="text-purple-600 font-bold text-xl sm:text-2xl">{{ products.length }}</p>
-      </div>
-      <div class="py-2 border-t sm:border-t-0 sm:border-l border-gray-200">
-        <p class="font-semibold text-base sm:text-lg">Total Bottles in Inventory</p>
-        <p class="text-purple-600 font-bold text-xl sm:text-2xl">{{ totalInventory }}</p>
-      </div>
-      <div class="py-2 border-t sm:border-t-0 sm:border-l border-gray-200">
-        <p class="font-semibold text-base sm:text-lg">Low Stock</p>
-        <p class="text-red-500 font-bold text-xl sm:text-2xl">{{ lowStockCount }}</p>
-      </div>
+    <div v-if="filteredProducts.length === 0" class="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
+      <Icon icon="tabler:search-off" class="w-16 h-16 text-gray-300 mx-auto mb-4" />
+      <h3 class="text-lg font-medium text-gray-900">No products found</h3>
+      <p class="text-gray-500">Try adjusting your search query.</p>
     </div>
   </div>
 
-  <!-- Add stock model -->
-  <el-dialog v-model="addStockModel" :width="dialogWidth" :show-close="true" class="!rounded-2xl">
-    <!-- Title -->
+  <el-dialog v-model="addStockModel" :width="dialogWidth" class="custom-modal">
     <template #title>
-      <span class="text-lg sm:text-[20px] font-semibold">Add Stock</span>
+      <div class="flex items-center gap-2">
+        <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
+          <Icon icon="tabler:circle-plus" class="w-6 h-6" />
+        </div>
+        <span class="text-xl font-bold">Add Stock</span>
+      </div>
     </template>
-
-    <!-- Product Title -->
-    <div class="mb-4">
-      <p class="text-sm sm:text-[16px] font-medium">
-        {{ selectedProduct?.name }}
-        <span class="text-gray-400 text-xs sm:text-[14px] block sm:inline mt-1 sm:mt-0">
-          • Current Stock: {{ selectedProduct?.stock }} Bottles
-        </span>
-      </p>
+    <div class="space-y-5">
+      <div class="bg-gray-50 p-3 rounded-xl">
+        <p class="text-sm font-bold text-gray-900">{{ selectedProduct?.name }}</p>
+        <p class="text-xs text-gray-500 mt-1">Current Balance: {{ selectedProduct?.stock }} Bottles</p>
+      </div>
+      <div class="space-y-1.5">
+        <label class="text-sm font-bold text-gray-700">Quantity (Bottles)</label>
+        <el-input v-model="addStockQantity" type="number" placeholder="0" class="modern-input" />
+      </div>
+      <div class="space-y-1.5 flex flex-col">
+        <label class="text-sm font-bold text-gray-700">Date Received</label>
+        <el-date-picker v-model="addStockDate" type="date" placeholder="Select date" class="!w-full modern-date" />
+      </div>
+      <div class="space-y-1.5">
+        <label class="text-sm font-bold text-gray-700">Notes</label>
+        <el-input v-model="addStokNote" type="textarea" placeholder="Batch details, supplier, etc..." :rows="3" />
+      </div>
     </div>
-
-    <!-- Quantity -->
-    <div class="mb-4">
-      <label class="text-xs sm:text-[14px] font-semibold">Quantity (Bottles)</label>
-      <el-input v-model="addStockQantity" placeholder="Enter quantity" class="mt-1 custom-input" />
-    </div>
-
-    <!-- Date -->
-    <div class="mb-4 flex flex-col add-stock-date">
-      <label class="text-xs sm:text-[14px] font-semibold mb-1">Date</label>
-      <el-date-picker v-model="addStockDate" type="date" placeholder="Select date" class="w-full custom-date-picker" />
-    </div>
-
-    <!-- Notes -->
-    <div class="mb-4">
-      <label class="text-xs sm:text-[14px] font-semibold">Notes</label>
-      <el-input v-model="addStokNote" type="textarea" placeholder="Add any notes or remarks…" autosize
-        class="mt-1 custom-input" />
-    </div>
-
-    <!-- Footer -->
     <template #footer>
-      <div class="flex justify-end gap-2 sm:gap-3">
-        <el-button @click="addStockModel = false" class="!px-4 sm:!px-6 !rounded-full !h-[36px] sm:!h-[40px] !text-sm sm:!text-base">
-          Cancel
-        </el-button>
-        <el-button type="primary" class="!bg-purple-600 hover:!bg-purple-700 !px-6 sm:!px-8 !text-white !rounded-full !h-[36px] sm:!h-[40px] !text-sm sm:!text-base"
-          @click="saveStock">
-          Confirm
-        </el-button>
+      <div class="flex gap-3">
+        <button @click="addStockModel = false" class="flex-1 px-4 py-3 rounded-xl border border-gray-200 font-bold text-sm">Cancel</button>
+        <button @click="saveStock" class="flex-1 px-4 py-3 rounded-xl bg-purple-600 text-white font-bold text-sm">Confirm Update</button>
       </div>
     </template>
   </el-dialog>
 
-  <!-- Dispatch Items Modal -->
-  <el-dialog v-model="dispatchModel" :width="dialogWidth" :show-close="true" class="!rounded-2xl">
-    <!-- Title -->
+  <el-dialog v-model="dispatchModel" :width="dialogWidth" class="custom-modal">
     <template #title>
-      <span class="text-lg sm:text-[20px] font-semibold">Dispatch Items</span>
+      <div class="flex items-center gap-2">
+        <div class="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+          <Icon icon="tabler:truck-delivery" class="w-6 h-6" />
+        </div>
+        <span class="text-xl font-bold">Dispatch Items</span>
+      </div>
     </template>
-
-    <!-- Product Title -->
-    <div class="mb-4">
-      <p class="text-sm sm:text-[16px] font-medium">
-        {{ selectedProduct?.name }}
-        <span class="text-gray-400 text-xs sm:text-[14px] block sm:inline mt-1 sm:mt-0">
-          • Current Stock: {{ selectedProduct?.stock }} Bottles
-        </span>
-      </p>
+    <div class="space-y-5">
+      <div class="bg-red-50 p-3 rounded-xl">
+        <p class="text-sm font-bold text-red-900">{{ selectedProduct?.name }}</p>
+        <p class="text-xs text-red-600 mt-1">Available to Dispatch: {{ selectedProduct?.stock }} Bottles</p>
+      </div>
+      <div class="space-y-1.5">
+        <label class="text-sm font-bold text-gray-700">Dispatch Quantity</label>
+        <el-input v-model="dispatchQuantity" type="number" placeholder="0" />
+      </div>
+      <div class="space-y-1.5">
+        <label class="text-sm font-bold text-gray-700">Customer Details / Reference</label>
+        <el-input v-model="dispatchNotes" type="textarea" placeholder="Customer name, order ID..." :rows="2" />
+      </div>
+      <div class="space-y-1.5 flex flex-col">
+        <label class="text-sm font-bold text-gray-700">Dispatch Date</label>
+        <el-date-picker v-model="dispatchDate" type="date" placeholder="Select date" class="!w-full" />
+      </div>
     </div>
-
-    <!-- Quantity -->
-    <div class="mb-4">
-      <label class="text-xs sm:text-[14px] font-semibold">Quantity to Dispatch (Bottles)</label>
-      <el-input v-model="dispatchQuantity" placeholder="Enter quantity to dispatch" class="mt-1 custom-input" />
-    </div>
-
-    <!-- Customer / Notes -->
-    <div class="mb-4">
-      <label class="text-xs sm:text-[14px] font-semibold">Customer / Notes</label>
-      <el-input v-model="dispatchNotes" type="textarea" placeholder="Enter customer name or notes…" autosize
-        class="mt-1 custom-input" />
-    </div>
-
-    <!-- Date -->
-    <div class="mb-4 flex flex-col">
-      <label class="text-xs sm:text-[14px] font-semibold mb-1">Dispatch Date</label>
-      <el-date-picker v-model="dispatchDate" type="date" placeholder="Select date" class="w-full custom-date-picker" />
-    </div>
-
-    <!-- Footer -->
     <template #footer>
-      <div class="flex justify-end gap-2 sm:gap-3">
-        <el-button @click="dispatchModel = false" class="!px-4 sm:!px-6 !rounded-full !h-[36px] sm:!h-[40px] !text-sm sm:!text-base">
-          Cancel
-        </el-button>
-        <el-button type="primary" class="!bg-red-600 hover:!bg-red-700 !px-6 sm:!px-8 !text-white !rounded-full !h-[36px] sm:!h-[40px] !text-sm sm:!text-base"
-          @click="confirmDispatch">
-          Dispatch
-        </el-button>
+      <div class="flex gap-3">
+        <button @click="dispatchModel = false" class="flex-1 px-4 py-3 rounded-xl border border-gray-200 font-bold text-sm">Cancel</button>
+        <button @click="confirmDispatch" class="flex-1 px-4 py-3 rounded-xl bg-red-600 text-white font-bold text-sm transition-all active:scale-95">Complete Dispatch</button>
       </div>
     </template>
   </el-dialog>
 
-  <!-- View Details Modal -->
-  <el-dialog v-model="viewDetailsModel" :width="detailsDialogWidth" :show-close="true" class="!rounded-2xl">
-    <!-- Title -->
-    <template #title>
-      <span class="text-lg sm:text-[20px] font-semibold">Product Details</span>
-    </template>
-
-    <!-- Product Info -->
-    <div class="mb-4 sm:mb-6">
-      <p class="text-sm sm:text-[16px] font-medium">
-        {{ selectedProduct?.name }}
-        <span class="text-gray-400 text-xs sm:text-[14px] block sm:inline mt-1 sm:mt-0">
-          • Current Stock: {{ selectedProduct?.stock }} Bottles
-        </span>
-      </p>
-    </div>
-
-    <!-- Activity Logs -->
-    <div class="max-h-[300px] sm:max-h-[400px] overflow-y-auto">
-      <ul class="space-y-2 sm:space-y-3">
-        <li v-for="(log, index) in productLogs" :key="index"
-          class="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded-lg sm:rounded-xl shadow-sm gap-2">
-          <div class="flex-1">
-            <p class="text-xs sm:text-sm font-medium">
-              {{ log.type === 'add' ? 'Stock Added' : 'Dispatched' }}
-              <span class="text-gray-400 font-normal text-xs">on {{ log.date }}</span>
-            </p>
-            <p class="text-gray-500 text-xs sm:text-sm mt-1">{{ log.notes }}</p>
+  <el-dialog v-model="viewDetailsModel" :width="detailsDialogWidth" class="custom-modal">
+    <template #title><span class="text-xl font-bold">Activity History</span></template>
+    <div class="space-y-4">
+      <div class="border-b border-gray-100 pb-4">
+        <h4 class="font-bold text-gray-900">{{ selectedProduct?.name }}</h4>
+        <p class="text-sm text-gray-500">{{ selectedProduct?.size }} • {{ selectedProduct?.stock }} In Stock</p>
+      </div>
+      <div class="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+        <div v-if="productLogs.length" class="space-y-3">
+          <div v-for="(log, index) in productLogs" :key="index" class="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+            <div :class="['w-10 h-10 rounded-full flex flex-shrink-0 items-center justify-center', log.type === 'add' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600']">
+              <Icon :icon="log.type === 'add' ? 'tabler:arrow-down-left' : 'tabler:arrow-up-right'" class="w-5 h-5" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex justify-between items-start">
+                <p class="font-bold text-sm text-gray-900">{{ log.type === 'add' ? 'Stock Added' : 'Dispatched' }}</p>
+                <p class="text-sm font-bold" :class="log.type === 'add' ? 'text-green-600' : 'text-red-600'">{{ log.type === 'add' ? '+' : '-' }}{{ log.quantity }}</p>
+              </div>
+              <p class="text-xs text-gray-500 mb-1">{{ log.date }}</p>
+              <p class="text-sm text-gray-600 italic">"{{ log.notes }}"</p>
+            </div>
           </div>
-          <div class="text-left sm:text-right">
-            <span :class="[
-              'px-2 py-1 rounded-full text-xs font-semibold inline-block',
-              log.type === 'add' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-            ]">
-              {{ log.quantity }} Bottles
-            </span>
-          </div>
-        </li>
-      </ul>
-    </div>
-
-    <!-- Footer -->
-    <template #footer>
-      <div class="flex justify-end">
-        <el-button @click="viewDetailsModel = false" class="!px-4 sm:!px-6 !rounded-full !h-[36px] sm:!h-[40px] !text-sm sm:!text-base">
-          Close
-        </el-button>
+        </div>
+        <div v-else class="text-center py-10 text-gray-400">
+          <Icon icon="tabler:history-off" class="w-10 h-10 mx-auto mb-2" />
+          <p>No activity recorded yet.</p>
+        </div>
       </div>
-    </template>
+    </div>
   </el-dialog>
 
-  <!-- Addnew stock model -->
   <AddNewStockModel v-model="isAddNewStock" @saved="fetchStockList" />
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { Icon } from '@iconify/vue';
 import AddNewStockModel from "@/components/AddNewStockModel.vue";
-
 import api from "@/services/api";
-import { onMounted } from "vue";
+import CommonLoader from "@/components/common/CommonLoader.vue";
+import axios from 'axios';
 
 const search = ref("");
-const addStockModel = ref(false)
-const addStokNote = ref("")
-const addStockQantity = ref()
-const addStockDate = ref()
-const isAddNewStock = ref(false)
-const dispatchModel = ref(false)
-const dispatchQuantity = ref()
-const dispatchNotes = ref("")
-const dispatchDate = ref()
+const addStockModel = ref(false);
+const addStokNote = ref("");
+const addStockQantity = ref();
+const addStockDate = ref();
+const isAddNewStock = ref(false);
+const dispatchModel = ref(false);
+const dispatchQuantity = ref();
+const dispatchNotes = ref("");
+const dispatchDate = ref();
 const products = ref([]);
 const selectedProduct = ref(null);
-
-const viewDetailsModel = ref(false)
-const productLogs = ref([
-  { type: 'add', quantity: 10, date: '2025-12-01', notes: 'New stock received' },
-  { type: 'dispatch', quantity: 5, date: '2025-12-02', notes: 'Dispatched to customer ABC' },
-  { type: 'add', quantity: 15, date: '2025-12-03', notes: 'Restocked' },
-  { type: 'dispatch', quantity: 7, date: '2025-12-04', notes: 'Dispatched to customer XYZ' },
-])
+const isLoading = ref(true);
+const exporting = ref(false);
+const viewDetailsModel = ref(false);
+const productLogs = ref([]);
 
 // Responsive dialog widths
 const dialogWidth = computed(() => {
   if (typeof window === 'undefined') return '480px';
-  return window.innerWidth < 640 ? '90%' : '480px';
+  return window.innerWidth < 640 ? '94%' : '480px';
 });
 
 const detailsDialogWidth = computed(() => {
   if (typeof window === 'undefined') return '600px';
-  return window.innerWidth < 640 ? '90%' : '600px';
+  return window.innerWidth < 640 ? '94%' : '600px';
 });
+
+const isValidImage = (img) => {
+  if (!img) return false;
+  return !(img.includes('null') || img.endsWith('5000') || img.includes('undefined'));
+};
 
 const formatDate = (date) => {
   return new Date(date).toLocaleDateString("en-IN", {
@@ -343,6 +266,37 @@ const formatDate = (date) => {
     month: "short",
     year: "numeric"
   });
+};
+
+// EXPORT FUNCTION
+const exportToExcel = async () => {
+  try {
+    exporting.value = true;
+    const response = await api.get('/stock/export/excel', {
+      responseType: 'blob' // Important for handling file downloads
+    });
+
+    // Create a blob from the response data
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // Create a filename with current date
+    const date = new Date().toISOString().split('T')[0];
+    link.setAttribute('download', `Stock_Inventory_Report_${date}.xlsx`);
+    
+    document.body.appendChild(link);
+    link.click();
+    
+    // Clean up
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Export failed:", error);
+    alert("Failed to export Excel report. Please try again.");
+  } finally {
+    exporting.value = false;
+  }
 };
 
 const openViewDetails = async (id) => {
@@ -353,15 +307,10 @@ const openViewDetails = async (id) => {
 
 const fetchProductHistory = async () => {
   if (!selectedProduct.value) return;
-
   try {
     const productId = selectedProduct.value.productId;
     const type = reverseFormatType(selectedProduct.value.size);
-
-    const res = await api.get(
-      `/stock/history/${productId}?type=${type}`
-    );
-
+    const res = await api.get(`/stock/history/${productId}?type=${type}`);
     productLogs.value = res.data.map(item => ({
       type: item.action === "ADD" ? "add" : "dispatch",
       quantity: item.quantity,
@@ -377,7 +326,7 @@ const openDispatchModel = (id) => {
   selectedProduct.value = products.value.find(p => p.id === id);
   dispatchQuantity.value = "";
   dispatchNotes.value = "";
-  dispatchDate.value = "";
+  dispatchDate.value = new Date();
   dispatchModel.value = true;
 };
 
@@ -385,7 +334,9 @@ const confirmDispatch = async () => {
   if (!dispatchQuantity.value || !dispatchDate.value) {
     return alert("Please fill all required fields");
   }
-
+  if (Number(dispatchQuantity.value) > selectedProduct.value.stock) {
+    return alert("Insufficient stock for this dispatch");
+  }
   try {
     const payload = {
       productId: selectedProduct.value.productId,
@@ -395,11 +346,8 @@ const confirmDispatch = async () => {
       notes: dispatchNotes.value || "",
       date: dispatchDate.value,
     };
-
     const res = await api.post("/stock/dispatch", payload);
-
     if (res.status === 200) {
-      console.log("Stock dispatched successfully");
       dispatchModel.value = false;
       fetchStockList();
     }
@@ -409,55 +357,57 @@ const confirmDispatch = async () => {
   }
 };
 
-// Filtered search list
 const filteredProducts = computed(() =>
   products.value.filter((p) =>
     p.name.toLowerCase().includes(search.value.toLowerCase())
   )
 );
 
-// Status text logic
 const getStatus = (stock) => {
   if (stock > 80) return "In Stock";
   if (stock > 20) return "Low Stock";
-  return "Very Low";
+  return "Critical";
 };
 
-// Footer stats
+const getStatusClass = (stock, mode) => {
+  const isGood = stock > 80;
+  const isWarning = stock > 20;
+  if (mode === 'badge') {
+    if (isGood) return 'bg-green-50 text-green-700 border border-green-100';
+    if (isWarning) return 'bg-yellow-50 text-yellow-700 border border-yellow-100';
+    return 'bg-red-50 text-red-700 border border-red-100';
+  }
+  if (mode === 'bg') {
+    if (isGood) return 'bg-green-500';
+    if (isWarning) return 'bg-yellow-500';
+    return 'bg-red-500';
+  }
+};
+
 const totalInventory = computed(() =>
   products.value.reduce((sum, item) => sum + item.stock, 0)
 );
 
 const lowStockCount = computed(() =>
-  products.value.filter((item) => item.stock < 20).length
+  products.value.filter((item) => item.stock <= 20).length
 );
 
 const reverseFormatType = (size) => {
-  return size
-    .toLowerCase()
-    .replace(" ", "_")
-    .replace("ml", "ml")
-    .replace("liter", "liter");
+  return size.toLowerCase().replace(" ", "_");
 };
 
-// Add stock model
 const openAddStockModel = (id) => {
   selectedProduct.value = products.value.find(p => p.id === id);
-
   addStockQantity.value = "";
-  addStockDate.value = "";
+  addStockDate.value = new Date();
   addStokNote.value = "";
-
   addStockModel.value = true;
 };
 
-// save stock
 const saveStock = async () => {
-  console.log("selectd product",selectedProduct.value)
   if (!addStockQantity.value || !addStockDate.value) {
     return alert("Please fill all required fields");
   }
-
   try {
     const payload = {
       productId: selectedProduct.value.productId,
@@ -467,11 +417,8 @@ const saveStock = async () => {
       date: addStockDate.value,
       bottleId: selectedProduct.value.bottleId
     };
-
     const res = await api.post("/stock/add", payload);
-
     if (res.status === 200 || res.data?.success) {
-      console.log("Stock added successfully");
       addStockModel.value = false;
       fetchStockList();
     }
@@ -481,30 +428,28 @@ const saveStock = async () => {
   }
 };
 
-// AddNewStock
 const addNewStock = () => {
-  isAddNewStock.value = true
-}
+  isAddNewStock.value = true;
+};
 
 onMounted(() => {
   fetchStockList();
 });
 
 const formatType = (type) => {
-  return type
-    .replace("_", " ")
-    .replace("ml", "ML")
-    .replace("liter", "Liter");
+  return type.replace("_", " ").replace("ml", "ML").replace("liter", "Liter");
 };
 
 const prepareImageLink = (image) => {
-  return `http://localhost:5000${image}`
-}
+  if (!image) return null;
+  if (image.startsWith('http')) return image;
+  return `https://sbev-admin.onrender.com${image}`;
+};
 
 const fetchStockList = async () => {
+  isLoading.value = true;
   try {
     const res = await api.get("/stock");
-    console.log("RES DATA:-",res.data)
     products.value = res.data.map((item) => ({
       id: item._id,
       productId: item.product._id,
@@ -512,14 +457,46 @@ const fetchStockList = async () => {
       size: formatType(item.type),
       stock: item.quantity,
       minLevel: item.minLevel,
-      image: prepareImageLink(item?.image),
+      image: prepareImageLink(item?.product?.image),
       date: item.date,
       bottleId: item.bottle,
     }));
   } catch (error) {
     console.error("Failed to fetch stock list", error);
+  } finally {
+    isLoading.value = false;
   }
 };
 </script>
 
-<style scoped></style>
+<style scoped>
+.custom-modal :deep(.el-dialog) {
+  border-radius: 24px;
+  overflow: hidden;
+  padding: 0;
+}
+.custom-modal :deep(.el-dialog__header) {
+  padding: 24px 24px 10px;
+}
+.custom-modal :deep(.el-dialog__body) {
+  padding: 10px 24px 20px;
+}
+.custom-modal :deep(.el-dialog__footer) {
+  padding: 0 24px 24px;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+@media (max-width: 640px) {
+  button {
+    min-height: 44px;
+  }
+}
+</style>
