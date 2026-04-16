@@ -50,6 +50,10 @@
           💰 <span>Sales Portal</span>
         </RouterLink>
 
+        <RouterLink to="/spend-trcker" class="sidebar-link" @click="isSidebarOpen=false">
+          📊 <span>Spend Tracker</span>
+        </RouterLink>
+
         <RouterLink to="/about" class="sidebar-link" @click="isSidebarOpen=false">
           ℹ️ <span>About</span>
         </RouterLink>

@@ -50,6 +50,11 @@ const routes = [
     path: '/sales-portal',
     name: 'sales-portal',
     component: SalesPortal
+  },
+  {
+    path: '/spend-trcker',
+    name: 'spend-trcker',
+    component: () => import('@/views/spend-tracker/SpendTracker.vue')
   }
 ]
 

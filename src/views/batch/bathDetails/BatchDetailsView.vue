@@ -200,7 +200,13 @@ const batch = ref(null);
 const getBatchDetails = async () => {
   try {
     loading.value = true;
-    const batchCode = route.params.id;
+
+    let batchCode = route.params.id;
+
+    // Convert format: 2026-0002 → 2026/0002
+    if (batchCode && batchCode.includes("-")) {
+      batchCode = batchCode.replace("-", "/");
+    }
 
     const res = await api.get("/batch/batches", {
       params: { batchCode }
