@@ -132,6 +132,7 @@
               <label class="block text-xs font-semibold text-gray-600 mb-1">Bottle Type</label>
               <select v-model="form.type" class="input-field">
                 <option value="">Select type</option>
+                <option value="200_ml">200 ML</option>
                 <option value="500_ml">500 ML</option>
                 <option value="1_liter">1 Liter</option>
                 <option value="5_liter">5 Liter</option>
@@ -290,6 +291,7 @@ const formatDate = (date) =>
 
 const formatType = (type) =>
   ({
+    "200_ml": "200 ML",
     "500_ml": "500 ML",
     "1_liter": "1 Liter",
     "5_liter": "5 Liter",

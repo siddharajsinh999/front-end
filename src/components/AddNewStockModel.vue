@@ -231,6 +231,7 @@ const productList = ref([]);
 const emptyBottleList = ref([]);
 
 const messurmentTtype = [
+  { value: "200_ml", name: "200 ml"},
   { value: "500_ml", name: "500 ml" },
   { value: "1_liter", name: "1 Liter" },
   { value: "5_liter", name: "5 Liter" },
@@ -238,6 +239,7 @@ const messurmentTtype = [
 ];
 
 const measurementLabelMap = {
+  "200_ml": "200 ml",
   "500_ml": "500 ml",
   "1_liter": "1 Liter",
   "5_liter": "5 Liter",
